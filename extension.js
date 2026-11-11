@@ -27,6 +27,7 @@ class ExternalEditorProvider {
 }
 
 function activate(context) {
+  require("./chatFiles").register(context, openOutside);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider("openOutside.external", new ExternalEditorProvider(), {
       supportsMultipleEditorsPerDocument: true,
