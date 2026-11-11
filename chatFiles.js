@@ -63,8 +63,10 @@ class ChatFilesProvider {
   }
 
   getTreeItem(it) {
+    if (it.files) return this.turnItem(it);
     const uri = vscode.Uri.file(it.path);
     const item = new vscode.TreeItem(uri, vscode.TreeItemCollapsibleState.None);
+    item.id = `${it.turnId}|${it.path}`;
     item.label = path.basename(it.path) || it.path;
     const parent = path.dirname(it.path);
     const cwd = this.cwd();
@@ -79,9 +81,25 @@ class ChatFilesProvider {
     return item;
   }
 
+  // One row per prompt; the newest starts open, the rest closed (VS Code remembers later toggles by id).
+  turnItem(t) {
+    const newest = this.turnsCache && this.turnsCache[0] && this.turnsCache[0].id === t.id;
+    const S = vscode.TreeItemCollapsibleState;
+    const item = new vscode.TreeItem(t.label, newest ? S.Expanded : S.Collapsed);
+    item.id = `turn|${t.id}`;
+    const hhmm = t.time ? new Date(t.time).toTimeString().slice(0, 5) : "";
+    item.description = [String(t.files.length), hhmm].filter(Boolean).join("  ");
+    item.tooltip = t.text || t.label;
+    item.iconPath = new vscode.ThemeIcon("comment");
+    item.contextValue = "chatTurn";
+    return item;
+  }
+
   getChildren(el) {
-    if (el || !this.extractor) return [];
-    return this.extractor.list().slice(0, MAX_ITEMS);
+    if (!this.extractor) return [];
+    if (!el) return (this.turnsCache = this.extractor.turnList().slice(0, MAX_ITEMS));
+    if (el.files) return el.files.map((f) => ({ ...f, turnId: el.id }));
+    return [];
   }
 }
 

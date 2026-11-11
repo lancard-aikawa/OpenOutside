@@ -48,6 +48,8 @@ class Extractor {
   constructor(defaultCwd) {
     this.cwd = defaultCwd;
     this.items = new Map(); // key: lowercased path -> { path, isDir, kind, seq }
+    this.turns = []; // one per user prompt: { id, label, text, time, items: Map }
+    this.turn = null;
     this.title = "";
     this.seq = 0;
     this.statCache = new Map();
@@ -69,11 +71,32 @@ class Extractor {
     if (/^[A-Za-z]:\\?$/.test(p)) return; // a bare drive is never meant
     const st = this.stat(p);
     if (!st) return;
+    if (st === "dir" && kind === "mention") return; // folders named in prose are mostly explanation, not targets
     const key = p.toLowerCase();
-    const prev = this.items.get(key);
     const rank = { mention: 0, read: 1, edit: 2 };
-    const k = prev && rank[prev.kind] > rank[kind] ? prev.kind : kind;
-    this.items.set(key, { path: p, isDir: st === "dir", kind: k, seq: ++this.seq });
+    const put = (map) => {
+      const prev = map.get(key);
+      const k = prev && rank[prev.kind] > rank[kind] ? prev.kind : kind;
+      map.set(key, { path: p, isDir: st === "dir", kind: k, seq: this.seq });
+    };
+    this.seq++;
+    put(this.items);
+    if (!this.turn) this.startTurn("(before the first prompt)", "", "", null);
+    put(this.turn.items);
+  }
+
+  startTurn(id, label, text, time) {
+    this.turn = { id, label, text, time, items: new Map() };
+    this.turns.push(this.turn);
+  }
+
+  // The prompt's first real line, with pasted-content / reminder tags removed.
+  static labelOf(text) {
+    const plain = text
+      .replace(/<(system-reminder|ide_selection|ide_opened_file)>[\s\S]*?<\/\1>/g, "")
+      .replace(/<\/?[A-Za-z_][^>]*>/g, "");
+    const line = plain.split("\n").map((s) => s.trim()).find(Boolean) || "";
+    return line.length > 40 ? line.slice(0, 40) + "…" : line;
   }
 
   // Accept the candidate, or the longest prefix of it that exists, without cutting back across a separator
@@ -127,8 +150,17 @@ class Extractor {
     if (o.isSidechain) return;
     const content = o.message && o.message.content;
     if (o.type === "user") {
-      if (typeof content === "string") this.scanText(content, this.cwd);
-      else if (Array.isArray(content)) for (const b of content) if (b.type === "text") this.scanText(b.text, this.cwd);
+      const texts =
+        typeof content === "string" ? [content] : Array.isArray(content) ? content.filter((b) => b.type === "text").map((b) => b.text) : [];
+      // A real prompt has text (tool results come back as their own user lines without text) and is not meta.
+      if (texts.length && !o.isMeta) {
+        const id = o.promptId || o.uuid;
+        if (!this.turn || this.turn.id !== id) {
+          const label = texts.map((t) => Extractor.labelOf(t)).find(Boolean) || "(prompt)";
+          this.startTurn(id, label, texts.join("\n").slice(0, 400), o.timestamp || null);
+        }
+      }
+      for (const t of texts) this.scanText(t, this.cwd);
     } else if (o.type === "assistant" && Array.isArray(content)) {
       for (const b of content) {
         if (b.type === "text") this.scanText(b.text, this.cwd);
@@ -143,6 +175,15 @@ class Extractor {
   // Newest first.
   list() {
     return [...this.items.values()].sort((a, b) => b.seq - a.seq);
+  }
+
+  // Newest prompt first; prompts that touched nothing are left out.
+  turnList() {
+    return this.turns
+      .filter((t) => t.items.size)
+      .slice()
+      .reverse()
+      .map((t) => ({ ...t, files: [...t.items.values()].sort((a, b) => b.seq - a.seq) }));
   }
 }
 
