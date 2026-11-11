@@ -19,11 +19,30 @@ class ExternalEditorProvider {
     return { uri, dispose() {} };
   }
   async resolveCustomEditor(document, panel) {
-    // Close the placeholder tab right away, then hand the file to the OS.
+    // Hand the file to the OS, then close the placeholder tab.
+    // Close it through the tab API, not panel.dispose(): disposing the webview
+    // under the workbench races with the explorer's preview-tab replacement
+    // (single click on the next file) and VS Code shows
+    // "'<previous file>' cannot be opened: OverlayWebview has been disposed".
     panel.webview.html = "<html><body></body></html>";
-    setTimeout(() => panel.dispose(), 0);
+    setTimeout(() => closePlaceholder(document.uri, panel), 0);
     await openOutside(document.uri);
   }
+}
+
+function closePlaceholder(uri, panel) {
+  const key = uri.toString();
+  const tabs = vscode.window.tabGroups.all
+    .flatMap((g) => g.tabs)
+    .filter((t) => t.input instanceof vscode.TabInputCustom
+      && t.input.viewType === "openOutside.external"
+      && t.input.uri.toString() === key);
+  if (tabs.length === 0) {
+    // No tab to close (should not happen); fall back to the old way.
+    try { panel.dispose(); } catch { /* already gone */ }
+    return;
+  }
+  vscode.window.tabGroups.close(tabs).then(undefined, () => { /* already closed */ });
 }
 
 function activate(context) {
