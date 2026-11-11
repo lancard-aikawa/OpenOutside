@@ -2,7 +2,7 @@
   "name": "open-outside",
   "displayName": "Open Outside",
   "description": "Open chosen file types in the OS default app, and list the files that appear in the Claude Code chat.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "lancard-aikawa",
   "license": "MIT",
   "private": true,

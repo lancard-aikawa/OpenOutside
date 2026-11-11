@@ -100,7 +100,7 @@ function sessionTitle(s) {
         return m[1];
       }
     };
-    title = grab(/"aiTitle":"((?:[^"\\]|\\.)*)"/g) || grab(/"lastPrompt":"((?:[^"\\]|\\.)*)"/g);
+    title = grab(/"aiTitle"\s*:\s*"((?:[^"\\]|\\.)*)"/g) || grab(/"lastPrompt"\s*:\s*"((?:[^"\\]|\\.)*)"/g);
   } catch {
   } finally {
     if (fd !== undefined) fs.closeSync(fd);

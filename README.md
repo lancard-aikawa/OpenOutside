@@ -38,10 +38,16 @@ Marketplace には出していないので、新しい版は自動では入り�
 
 エクスプローラの下に「Chat Files」の欄が出ます。今開いているフォルダで動いている Claude Code の会話を見張り、出てきたファイルを、自分の発言ごとにまとめて並べます（新しい発言が上）。
 
+![Chat Files の欄。発言ごとの箱の中に、Claude が編集したファイル（edited）・読んだファイル（read）・会話に書かれたファイルが並ぶ。ワークスペースの外のファイルは場所が絶対パスで出る](docs/images/chat-files.png)
+
+<sub>画面は架空のプロジェクトと架空の会話の記録で撮ったものです（`demo/` で作り直せます）。</sub>
+
 - **拾うもの**: Claude が読んだ・書いたファイル（`read` / `edited` と付く）と、返答や自分の発言に書かれたファイルのパス（`C:\...`、`%APPDATA%\...`、`~/...`、Markdown のリンク、`` ` `` で囲んだ相対パス）。実在するものだけ
 - **ファイルをクリック**: VS Code のタブで開く。開いているフォルダの外や、別のドライブのファイルも開けて、そのまま編集できる
 - **行の右のボタン・右クリック**: Explorer（エクスプローラ / Finder で場所を示す）・Outside（既定のアプリで開く）・Edit（外で開く種類でも VS Code で開く）・Copy Path
 - **前の会話**: 欄の右上の History（時計の印）で、このフォルダの会話を題と日時から選ぶ。選んだ会話に固定され、欄の題の横に `pinned` と出る。右上の Latest で、最新の会話について行く形に戻る
+
+![History の一覧。このフォルダの会話が題と日時で並び、一番上の Latest で最新の会話について行く形に戻せる](docs/images/history.png)
 
 ## 読むもの・送るもの
 
@@ -64,6 +70,7 @@ npx -y @vscode/vsce package
 - 会話からパスを拾う処理だけを試す: `node tools/try_extract.js <フォルダ>`
 - 会話の一覧と読み込みの速さ: `node tools/try_sessions.js <フォルダ>`（手元では会話 51 件の題が約 50ms、50MB の会話の読み込みが約 0.2 秒）
 - アイコンを描き直す: `uv run --no-project --with pillow python tools/make_icon.py`
+- README の画面を撮り直す（Windows）: `python demo/make_demo.py` → `npx -y @vscode/vsce package -o demo/run/demo.vsix` → `uv run --no-project --with pillow python demo/shoot.py`。架空のプロジェクトと会話の記録を `demo/run/` に作り、自分の設定や会話とは切り離した VS Code で撮る。VS Code の窓が前に出てキーが送られるので、30 秒ほど触らない
 
 ## ライセンス
 

@@ -1,3 +1,5 @@
 .gitignore
 *.vsix
 tools/**
+demo/**
+docs/**
