@@ -1,0 +1,32 @@
+{
+  "name": "open-outside",
+  "displayName": "Open Outside",
+  "description": "Open chosen file types in the OS default app instead of a VS Code tab.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "MIT",
+  "private": true,
+  "repository": { "type": "git", "url": "https://example.invalid/open-outside" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "openOutside.external",
+        "displayName": "Open Outside (OS default app)",
+        "selector": [{ "filenamePattern": "*" }],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      { "command": "openOutside.open", "title": "Open Outside", "category": "Open Outside" }
+    ],
+    "menus": {
+      "explorer/context": [
+        { "command": "openOutside.open", "when": "!explorerResourceIsFolder", "group": "navigation@99" }
+      ]
+    }
+  }
+}
