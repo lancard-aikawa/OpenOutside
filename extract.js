@@ -44,6 +44,74 @@ function newestSession(dirs) {
   return best && best.file;
 }
 
+// Every session of these folders, newest first: { file, mtime, size }.
+function listSessions(dirs) {
+  const out = [];
+  for (const dir of dirs) {
+    let names = [];
+    try {
+      names = fs.readdirSync(dir).filter((n) => n.endsWith(".jsonl"));
+    } catch {
+      continue;
+    }
+    for (const n of names) {
+      const p = path.join(dir, n);
+      try {
+        const s = fs.statSync(p);
+        out.push({ file: p, mtime: s.mtimeMs, size: s.size });
+      } catch {}
+    }
+  }
+  return out.sort((a, b) => b.mtime - a.mtime);
+}
+
+const CHUNK = 256 * 1024;
+const titleCache = new Map(); // file -> { mtime, title }
+
+function readSlice(fd, start, len) {
+  const buf = Buffer.alloc(len);
+  const n = fs.readSync(fd, buf, 0, len, start);
+  return buf.subarray(0, n).toString("utf8");
+}
+
+function lastMatch(text, re) {
+  let m, last = null;
+  while ((m = re.exec(text))) last = m;
+  return last;
+}
+
+// The session's title without reading the whole file: the last "ai-title" in the tail, else in the head,
+// else the last prompt, else the id.
+function sessionTitle(s) {
+  const hit = titleCache.get(s.file);
+  if (hit && hit.mtime === s.mtime) return hit.title;
+  let title = "";
+  let fd;
+  try {
+    fd = fs.openSync(s.file, "r");
+    const tail = readSlice(fd, Math.max(0, s.size - CHUNK), Math.min(CHUNK, s.size));
+    const head = s.size > CHUNK ? readSlice(fd, 0, CHUNK) : "";
+    const grab = (re) => {
+      const m = lastMatch(tail, re) || lastMatch(head, re);
+      if (!m) return "";
+      try {
+        return JSON.parse(`"${m[1]}"`);
+      } catch {
+        return m[1];
+      }
+    };
+    title = grab(/"aiTitle":"((?:[^"\\]|\\.)*)"/g) || grab(/"lastPrompt":"((?:[^"\\]|\\.)*)"/g);
+  } catch {
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+  title = title.replace(/\s+/g, " ").trim();
+  if (title.length > 60) title = title.slice(0, 60) + "…";
+  if (!title) title = path.basename(s.file, ".jsonl").slice(0, 8);
+  titleCache.set(s.file, { mtime: s.mtime, title });
+  return title;
+}
+
 class Extractor {
   constructor(defaultCwd) {
     this.cwd = defaultCwd;
@@ -216,4 +284,4 @@ class Tail {
   }
 }
 
-module.exports = { projectDirs, projectDirName, newestSession, Extractor, Tail };
+module.exports = { projectDirs, projectDirName, newestSession, listSessions, sessionTitle, Extractor, Tail };

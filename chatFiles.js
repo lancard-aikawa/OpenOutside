@@ -2,7 +2,7 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
-const { projectDirs, newestSession, Extractor, Tail } = require("./extract");
+const { projectDirs, newestSession, listSessions, sessionTitle, Extractor, Tail } = require("./extract");
 
 const KIND_LABEL = { edit: "edited", read: "read", mention: "" };
 const MAX_ITEMS = 300;
@@ -17,6 +17,13 @@ class ChatFilesProvider {
     this.watchers = [];
     this.timer = null;
     this.view = null;
+    this.pinned = null; // a chosen session file; null = follow the newest
+  }
+
+  pin(file) {
+    this.pinned = file;
+    vscode.commands.executeCommand("setContext", "openOutside.pinned", !!file);
+    this.update();
   }
 
   cwd() {
@@ -49,17 +56,22 @@ class ChatFilesProvider {
   update() {
     const cwd = this.cwd();
     if (!cwd) return;
-    const file = newestSession(projectDirs(cwd));
+    const file = this.pinned || newestSession(projectDirs(cwd));
     if (!file) return;
+    let changed = false;
     if (file !== this.session) {
       this.session = file;
       this.extractor = new Extractor(cwd);
       this.tail = new Tail(file);
+      changed = true;
     }
     const before = this.extractor.seq;
     this.tail.read((l) => this.extractor.line(l));
-    if (this.view) this.view.description = this.extractor.title || path.basename(file, ".jsonl").slice(0, 8);
-    if (this.extractor.seq !== before) this._onDidChange.fire();
+    if (this.view) {
+      const title = this.extractor.title || path.basename(file, ".jsonl").slice(0, 8);
+      this.view.description = this.pinned ? `${title} · pinned` : title;
+    }
+    if (changed || this.extractor.seq !== before) this._onDidChange.fire();
   }
 
   getTreeItem(it) {
@@ -103,6 +115,35 @@ class ChatFilesProvider {
   }
 }
 
+// Pick which session the view shows. The first entry goes back to following the newest one.
+async function pickSession(provider) {
+  const cwd = provider.cwd();
+  if (!cwd) return;
+  const sessions = listSessions(projectDirs(cwd));
+  const fmt = (ms) => {
+    const d = new Date(ms);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+  const items = [
+    { label: "$(sync) Latest", description: "follow the newest session", file: null },
+    { label: "", kind: vscode.QuickPickItemKind.Separator },
+    ...sessions.map((s) => ({
+      label: sessionTitle(s),
+      description: fmt(s.mtime),
+      detail: s.file === provider.session ? "$(eye) showing now" : undefined,
+      file: s.file,
+    })),
+  ];
+  const pick = await vscode.window.showQuickPick(items, {
+    title: "Chat Files: session",
+    placeHolder: "Type to filter by title",
+    matchOnDescription: true,
+  });
+  if (!pick) return;
+  provider.pin(pick.file);
+}
+
 function register(context, openOutside) {
   const provider = new ChatFilesProvider();
   const view = vscode.window.createTreeView("openOutside.chatFiles", { treeDataProvider: provider });
@@ -112,6 +153,8 @@ function register(context, openOutside) {
     view,
     { dispose: () => provider.stop() },
     vscode.commands.registerCommand("openOutside.refresh", () => provider.start()),
+    vscode.commands.registerCommand("openOutside.history", () => pickSession(provider)),
+    vscode.commands.registerCommand("openOutside.latest", () => provider.pin(null)),
     vscode.commands.registerCommand("openOutside.openFolder", (x) => {
       const uri = uriOf(x);
       if (uri) vscode.env.openExternal(uri);

@@ -2,7 +2,7 @@
   "name": "open-outside",
   "displayName": "Open Outside",
   "description": "Open chosen file types in the OS default app, and list the files that appear in the Claude Code chat.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "local",
   "license": "MIT",
   "private": true,
@@ -28,6 +28,8 @@
     "commands": [
       { "command": "openOutside.open", "title": "Open Outside", "category": "Open Outside" },
       { "command": "openOutside.refresh", "title": "Refresh", "icon": "$(refresh)", "category": "Open Outside" },
+      { "command": "openOutside.history", "title": "History", "icon": "$(history)", "category": "Open Outside" },
+      { "command": "openOutside.latest", "title": "Latest", "icon": "$(sync)", "category": "Open Outside" },
       { "command": "openOutside.openItem", "title": "Outside", "icon": "$(link-external)" },
       { "command": "openOutside.openFolder", "title": "Folder", "icon": "$(folder-opened)" },
       { "command": "openOutside.reveal", "title": "Explorer", "icon": "$(folder-opened)" },
@@ -39,7 +41,9 @@
         { "command": "openOutside.open", "when": "!explorerResourceIsFolder", "group": "navigation@99" }
       ],
       "view/title": [
-        { "command": "openOutside.refresh", "when": "view == openOutside.chatFiles", "group": "navigation" }
+        { "command": "openOutside.latest", "when": "view == openOutside.chatFiles && openOutside.pinned", "group": "navigation@1" },
+        { "command": "openOutside.history", "when": "view == openOutside.chatFiles", "group": "navigation@2" },
+        { "command": "openOutside.refresh", "when": "view == openOutside.chatFiles", "group": "navigation@3" }
       ],
       "view/item/context": [
         { "command": "openOutside.reveal", "when": "view == openOutside.chatFiles && viewItem == chatFile", "group": "inline@1" },

@@ -45,4 +45,6 @@ code --install-extension open-outside-0.0.1.vsix
 
 会話を取り違えることがある: 同じフォルダで会話を 2 つ並べていると、最後に書き換わった方を出す。jsonl の形は Claude Code の内部のもので、版が上がると拾えなくなるかもしれない。
 
-拾い方だけを試す: `node tools/try_extract.js <フォルダ>`
+前の会話を見る: 欄の右上の History（時計の印）で、このフォルダの会話を題と日時の一覧から選ぶ（題の文字で絞り込める）。選んだ会話に固定され、欄の題の横に `pinned` と出る。最新の会話について行く形に戻すには、右上の Latest か、一覧の一番上の Latest を選ぶ。題は jsonl の頭と末尾の 256KB にある `ai-title` から取るので、大きな会話でも一覧は速い（51 件で約 50ms。50MB の会話を開くのに約 0.2 秒）。
+
+拾い方だけを試す: `node tools/try_extract.js <フォルダ>`、会話の一覧と読み込みの速さ: `node tools/try_sessions.js <フォルダ>`
