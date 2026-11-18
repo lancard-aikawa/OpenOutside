@@ -18,6 +18,7 @@ class ChatFilesProvider {
     this.timer = null;
     this.view = null;
     this.pinned = null; // a chosen session file; null = follow the newest
+    this.editing = new Set(); // lowercased paths opened with Edit: Claude's links to these stay in VS Code
   }
 
   pin(file) {
@@ -165,7 +166,9 @@ function register(context, openOutside) {
     }),
     vscode.commands.registerCommand("openOutside.edit", (x) => {
       const uri = uriOf(x);
-      if (uri) vscode.commands.executeCommand("vscode.openWith", uri, "default");
+      if (!uri) return;
+      provider.editing.add(uri.fsPath.toLowerCase()); // asked to edit: keep it in VS Code from now on
+      vscode.commands.executeCommand("vscode.openWith", uri, "default");
     }),
     vscode.commands.registerCommand("openOutside.copyPath", (x) => {
       const uri = uriOf(x);
@@ -175,6 +178,36 @@ function register(context, openOutside) {
     vscode.workspace.onDidChangeWorkspaceFolders(() => provider.start())
   );
   provider.start();
+  watchChatLinks(context, provider, openOutside);
+}
+
+/* Claude's chat links open files with showTextDocument, which skips workbench.editorAssociations
+   (only a file that can't be read as text falls back to vscode.open). So an .html Claude linked opens as source.
+   A link Claude writes is for looking at, not editing: when a text tab opens for a file Claude linked in the shown
+   session and its extension is in openOutside.chatLinks, close the tab and open the file in the OS default app.
+   Files opened with Chat Files > Edit stay in VS Code. */
+function watchChatLinks(context, provider, openOutside) {
+  const recent = new Map(); // path -> time handled, so one click is handled once
+  const check = (tab) => {
+    if (!(tab.input instanceof vscode.TabInputText) || tab.input.uri.scheme !== "file") return;
+    const uri = tab.input.uri;
+    const key = path.normalize(uri.fsPath).toLowerCase();
+    const exts = vscode.workspace.getConfiguration("openOutside").get("chatLinks", [".html", ".htm"]).map((e) => e.toLowerCase());
+    if (!exts.includes(path.extname(key))) return;
+    provider.update(); // the click may come right after the reply was written
+    if (!provider.extractor || !provider.extractor.linked.has(key) || provider.editing.has(key)) return;
+    if (tab.isDirty) return;
+    const now = Date.now();
+    if (now - (recent.get(key) || 0) < 1500) return;
+    recent.set(key, now);
+    vscode.window.tabGroups.close(tab).then(undefined, () => {});
+    openOutside(uri);
+  };
+  context.subscriptions.push(
+    vscode.window.tabGroups.onDidChangeTabs((e) => {
+      for (const t of [...e.opened, ...e.changed]) check(t);
+    })
+  );
 }
 
 module.exports = { register };

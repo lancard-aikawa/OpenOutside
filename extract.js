@@ -116,6 +116,7 @@ class Extractor {
   constructor(defaultCwd) {
     this.cwd = defaultCwd;
     this.items = new Map(); // key: lowercased path -> { path, isDir, kind, seq }
+    this.linked = new Set(); // lowercased paths Claude wrote as markdown links (the ones a person can click in the chat)
     this.turns = []; // one per user prompt: { id, label, text, time, items: Map }
     this.turn = null;
     this.title = "";
@@ -185,16 +186,19 @@ class Extractor {
       const p = abs(cut);
       if (this.stat(p)) {
         this.add(p, kind);
-        return;
+        return p;
       }
     }
+    return null;
   }
 
-  scanText(text, base) {
+  // linked: Claude's own text, where a markdown link is something the person is meant to click and look at
+  scanText(text, base, linked = false) {
     if (!text) return;
     for (const m of text.matchAll(/\]\(([^)\s]+)\)/g)) {
       if (/^[a-z]+:\/\//i.test(m[1]) && !/^file:/i.test(m[1])) continue;
-      this.addLoose(m[1], "mention", base);
+      const p = this.addLoose(m[1], "mention", base);
+      if (p && linked) this.linked.add(path.normalize(p).toLowerCase());
     }
     for (const m of text.matchAll(/(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s`'"<>|*?]*/g)) this.addLoose(m[0], "mention", base);
     for (const m of text.matchAll(/(?:%USERPROFILE%|%APPDATA%|~)[\\/][^\s`'"<>|*?]*/gi)) this.addLoose(m[0], "mention", base);
@@ -231,7 +235,7 @@ class Extractor {
       for (const t of texts) this.scanText(t, this.cwd);
     } else if (o.type === "assistant" && Array.isArray(content)) {
       for (const b of content) {
-        if (b.type === "text") this.scanText(b.text, this.cwd);
+        if (b.type === "text") this.scanText(b.text, this.cwd, true);
         else if (b.type === "tool_use" && FILE_TOOLS[b.name]) {
           const p = b.input && (b.input.file_path || b.input.notebook_path);
           if (p) this.add(path.isAbsolute(p) ? p : path.resolve(this.cwd, p), FILE_TOOLS[b.name]);

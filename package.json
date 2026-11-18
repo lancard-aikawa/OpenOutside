@@ -2,7 +2,7 @@
   "name": "open-outside",
   "displayName": "Open Outside",
   "description": "Open chosen file types in the OS default app, and list the files that appear in the Claude Code chat.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "lancard-aikawa",
   "license": "MIT",
   "private": true,
@@ -24,6 +24,17 @@
         "priority": "option"
       }
     ],
+    "configuration": {
+      "title": "Open Outside",
+      "properties": {
+        "openOutside.chatLinks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".html", ".htm"],
+          "markdownDescription": "File types that open in the OS default app when you click Claude's link to them in the chat. Claude's chat links open files as source text and skip `workbench.editorAssociations`; a link Claude writes is for looking at. Use **Edit** in Chat Files to keep a file in VS Code. Empty list = off."
+        }
+      }
+    },
     "views": {
       "explorer": [
         { "id": "openOutside.chatFiles", "name": "Chat Files", "icon": "$(comment-discussion)" }
